@@ -1,0 +1,13 @@
+# Secrets: never committed
+.env
+*.env
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# ADK runtime state
+.adk/
+*.log
