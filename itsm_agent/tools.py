@@ -116,3 +116,102 @@ def detect_recurrence(incidents: list[dict]) -> dict:
     recurrences.sort(key=lambda g: -g["count"])
     singletons = sum(len(m) for m in groups.values() if len(m) == 1)
     return {"recurrences": recurrences, "singletons": singletons}
+
+def propose_problem(ci: str, ci_sys_id: str, symptom: str, incident_numbers: list[str], incident_sys_ids: list[str]) -> dict:
+    """Build a DRAFT Problem record for a detected recurrence. Writes NOTHING.
+
+    Call this after detect_recurrence, with the fields of one recurrence group.
+    Show the returned draft to the user and ask for explicit approval before
+    calling create_problem. The draft includes a 'draft_id' that create_problem
+    requires: it guarantees that what gets written is exactly what was shown.
+
+    Returns a dict with: draft_id, short_description, description, cmdb_ci,
+    impact, urgency, incident_numbers, incident_sys_ids, status='draft'.
+    """
+    import hashlib
+    import json
+
+    draft = {
+        "short_description": f"Recurring: {symptom} ({ci})",
+        "description": (
+            f"Recurring incident pattern detected by the ITSM assistant.\n"
+            f"Service / CI: {ci}\nSymptom: {symptom}\n"
+            f"Related incidents ({len(incident_numbers)}): {', '.join(incident_numbers)}\n"
+            f"Proposed for human review; created only after explicit approval."
+        ),
+        "cmdb_ci": ci_sys_id,
+        "impact": "2",
+        "urgency": "2",
+        "incident_numbers": sorted(incident_numbers),
+        "incident_sys_ids": sorted(incident_sys_ids),
+    }
+    draft["draft_id"] = hashlib.sha256(json.dumps(draft, sort_keys=True).encode()).hexdigest()[:12]
+    draft["status"] = "draft"
+    return draft
+
+def _sn_post(table: str, payload: dict) -> dict:
+    base, auth = _sn()
+    r = requests.post(
+        f"{base}/api/now/table/{table}",
+        json=payload, auth=auth,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["result"]
+
+
+def _sn_patch(table: str, sys_id: str, payload: dict) -> dict:
+    base, auth = _sn()
+    r = requests.patch(
+        f"{base}/api/now/table/{table}/{sys_id}",
+        json=payload, auth=auth,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["result"]
+
+
+def create_problem(draft: dict) -> dict:
+    """WRITE a Problem record in ServiceNow from a draft produced by propose_problem.
+
+    This tool requires the user's explicit confirmation (the framework pauses
+    and asks before running it). Pass the draft dict EXACTLY as returned by
+    propose_problem: its draft_id is re-computed and the call is refused if
+    the content was altered. On success, the related incidents are linked to
+    the new Problem.
+
+    Returns a dict with: status ('created' or 'refused'), problem_number,
+    problem_sys_id, linked_incidents, reason (when refused).
+    """
+    import hashlib
+    import json
+
+    check = {k: v for k, v in draft.items() if k not in ("draft_id", "status")}
+    expected = hashlib.sha256(json.dumps(check, sort_keys=True).encode()).hexdigest()[:12]
+    if draft.get("draft_id") != expected:
+        return {"status": "refused", "reason": "draft_id does not match the draft content; call propose_problem again."}
+
+    problem = _sn_post(
+        "problem",
+        {
+            "short_description": draft["short_description"],
+            "description": draft["description"],
+            "cmdb_ci": draft["cmdb_ci"],
+            "impact": draft["impact"],
+            "urgency": draft["urgency"],
+            "correlation_id": "adk-demo",
+        },
+    )
+    linked = []
+    for sys_id, number in zip(draft["incident_sys_ids"], draft["incident_numbers"]):
+        _sn_patch("incident", sys_id, {"problem_id": problem["sys_id"]})
+        linked.append(number)
+
+    return {
+        "status": "created",
+        "problem_number": problem["number"],
+        "problem_sys_id": problem["sys_id"],
+        "linked_incidents": linked,
+    }
