@@ -1,0 +1,4 @@
+google-adk==2.13.0
+google-cloud-aiplatform==2.6.0
+python-dotenv==1.2.4
+requests==2.34.2

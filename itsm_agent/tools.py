@@ -8,6 +8,7 @@ account read from the environment. No credential lives in the code.
 """
 import os
 from collections import defaultdict
+from google.adk.tools import ToolContext
 
 import requests
 
@@ -117,19 +118,23 @@ def detect_recurrence(incidents: list[dict]) -> dict:
     singletons = sum(len(m) for m in groups.values() if len(m) == 1)
     return {"recurrences": recurrences, "singletons": singletons}
 
-def propose_problem(ci: str, ci_sys_id: str, symptom: str, incident_numbers: list[str], incident_sys_ids: list[str]) -> dict:
+def propose_problem(ci: str, ci_sys_id: str, symptom: str, incident_numbers: list[str], incident_sys_ids: list[str], tool_context: ToolContext) -> dict:
     """Build a DRAFT Problem record for a detected recurrence. Writes NOTHING.
 
-    Call this after detect_recurrence, with the fields of one recurrence group.
-    Show the returned draft to the user and ask for explicit approval before
-    calling create_problem. The draft includes a 'draft_id' that create_problem
-    requires: it guarantees that what gets written is exactly what was shown.
+    Call this after detect_recurrence, with the fields of one recurrence group
+    (at least two incidents: a Problem documents a recurrence, not a single
+    incident). Show the returned draft to the user and ask for explicit
+    approval before calling create_problem. The draft includes a 'draft_id'
+    that create_problem requires: it guarantees that what gets written is
+    exactly what was shown.
 
-    Returns a dict with: draft_id, short_description, description, cmdb_ci,
-    impact, urgency, incident_numbers, incident_sys_ids, status='draft'.
+    Returns the draft dict (status='draft'), or {status:'refused', reason}.
     """
     import hashlib
     import json
+
+    if len(incident_numbers) < 2:
+        return {"status": "refused", "reason": "A Problem documents a recurrence: at least two incidents are required."}
 
     draft = {
         "short_description": f"Recurring: {symptom} ({ci})",
@@ -147,6 +152,8 @@ def propose_problem(ci: str, ci_sys_id: str, symptom: str, incident_numbers: lis
     }
     draft["draft_id"] = hashlib.sha256(json.dumps(draft, sort_keys=True).encode()).hexdigest()[:12]
     draft["status"] = "draft"
+    tool_context.state["pending_draft"] = draft
+    tool_context.state["pending_draft_invocation"] = tool_context.invocation_id
     return draft
 
 def _sn_post(table: str, payload: dict) -> dict:
@@ -173,20 +180,23 @@ def _sn_patch(table: str, sys_id: str, payload: dict) -> dict:
     return r.json()["result"]
 
 
-def create_problem(draft: dict) -> dict:
+def create_problem(draft: dict, confirmed: bool, tool_context: ToolContext) -> dict:
     """WRITE a Problem record in ServiceNow from a draft produced by propose_problem.
 
-    This tool requires the user's explicit confirmation (the framework pauses
-    and asks before running it). Pass the draft dict EXACTLY as returned by
-    propose_problem: its draft_id is re-computed and the call is refused if
-    the content was altered. On success, the related incidents are linked to
-    the new Problem.
+    Call this ONLY in a later turn, after the user has explicitly approved the
+    draft, with confirmed=True and the draft EXACTLY as returned by
+    propose_problem. A guard refuses the call if the draft was proposed in the
+    same turn, if its draft_id does not match, or if confirmed is false.
+    On success, the related incidents are linked to the new Problem.
 
     Returns a dict with: status ('created' or 'refused'), problem_number,
     problem_sys_id, linked_incidents, reason (when refused).
     """
     import hashlib
     import json
+
+    if not confirmed:
+        return {"status": "refused", "reason": "confirmed is false: the user has not approved the draft."}
 
     check = {k: v for k, v in draft.items() if k not in ("draft_id", "status")}
     expected = hashlib.sha256(json.dumps(check, sort_keys=True).encode()).hexdigest()[:12]
@@ -208,6 +218,9 @@ def create_problem(draft: dict) -> dict:
     for sys_id, number in zip(draft["incident_sys_ids"], draft["incident_numbers"]):
         _sn_patch("incident", sys_id, {"problem_id": problem["sys_id"]})
         linked.append(number)
+
+    tool_context.state["pending_draft"] = None
+    tool_context.state["pending_draft_invocation"] = None
 
     return {
         "status": "created",

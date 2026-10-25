@@ -10,7 +10,7 @@ import os
 import requests
 from dotenv import load_dotenv
 
-load_dotenv("itsm_agent/.env")
+load_dotenv(".env")
 
 BASE = os.environ["SERVICENOW_INSTANCE_URL"].rstrip("/")
 AUTH = (os.environ["SERVICENOW_USERNAME"], os.environ["SERVICENOW_PASSWORD"])
