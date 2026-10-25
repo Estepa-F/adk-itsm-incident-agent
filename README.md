@@ -24,6 +24,12 @@ Gemini Enterprise Agent Platform** (the platform formerly known as Vertex AI Age
 The same scenario runs locally (`adk web`), from the Agent Platform console Playground, and from the
 deployed agent's API (`deploy/query.py`).
 
+**Video walkthrough (2 min 35, English subtitles):**
+[docs/demo/adk-itsm-incident-agent-demo.mp4](docs/demo/adk-itsm-incident-agent-demo.mp4) —
+GitHub opens it in a player. The narration is in
+[docs/demo/demo-script.md](docs/demo/demo-script.md), the subtitles in
+[docs/demo/adk-itsm-incident-agent-demo.srt](docs/demo/adk-itsm-incident-agent-demo.srt).
+
 ## Architecture
 
 ```
@@ -67,6 +73,7 @@ deploy/
 scripts/
   seed_demo_data.py  create the five demo incidents (correlation_id = adk-demo)
 docs/
+  demo/              2:35 video walkthrough (mp4), subtitles (srt) and narration script
   architecture.md    design decisions, limitations, next steps
   screenshots/       console, Playground, adk web and ServiceNow evidence
 .env.example         every variable the agent needs, with no value

@@ -1,0 +1,59 @@
+1
+00:00:00,000 --> 00:00:11,600
+Hi, I'm François. This is a personal prototype built with the Google Agent Development Kit, deployed on Agent Runtime in the Gemini Enterprise Agent Platform.
+
+2
+00:00:11,600 --> 00:00:21,500
+The use case: a support manager asks about open incidents. The agent reads ServiceNow, detects recurrences, and proposes a Problem record.
+
+3
+00:00:21,500 --> 00:00:33,900
+It writes only after explicit human approval. The repository is public, MIT licensed, every variable is documented, and no secret lives in the code or the history.
+
+4
+00:00:33,900 --> 00:00:45,900
+One root agent on Gemini 3.5 Flash, pinned to the EU multi-region endpoint, and four tools: list incidents, detect recurrence, propose a Problem, create a Problem.
+
+5
+00:00:45,900 --> 00:00:57,500
+Proposing and writing are two separate tools. The write is guarded by a before_tool_callback: the approval is enforced in code, not only in the prompt.
+
+6
+00:00:57,500 --> 00:01:07,400
+The agent is deployed on Agent Runtime in europe-west1, Belgium, with managed sessions. Let's run the scenario from the console Playground.
+
+7
+00:01:07,400 --> 00:01:13,200
+I ask: which open incidents concern the payroll application this week?
+
+8
+00:01:13,200 --> 00:01:22,700
+The agent calls list_incidents against the ServiceNow Table API, then detect_recurrence, then propose_problem. Each call is visible as an event.
+
+9
+00:01:22,700 --> 00:01:34,700
+Three incidents on SAP Payroll share the same symptom. The agent proposes a draft Problem with a draft ID, and stops. Nothing has been written yet.
+
+10
+00:01:34,700 --> 00:01:48,000
+In a later turn, I answer: yes, create it. The guard checks three things: the draft ID matches, the proposal came from an earlier turn, and confirmed is true.
+
+11
+00:01:48,000 --> 00:01:54,600
+Only then does create_problem post the Problem record and link the three incidents.
+
+12
+00:01:54,600 --> 00:02:04,500
+Here is ServiceNow. The Problem record exists, created by a dedicated service account with the itil role, not by an admin.
+
+13
+00:02:04,500 --> 00:02:11,500
+Title, configuration item, description and the related incidents, exactly as proposed in the draft.
+
+14
+00:02:11,500 --> 00:02:20,600
+The three incidents are now linked to the Problem, and every update is audited under the service account adk_svc.
+
+15
+00:02:20,600 --> 00:02:34,700
+Limitations are listed in the README: demo data on a developer instance, basic authentication, secrets as plain environment variables. Secret Manager and OAuth 2.0 are the next steps. Thanks for watching.
