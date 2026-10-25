@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv(".env")
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
-LOCATION = os.environ.get("AGENT_RUNTIME_LOCATION", "eu")
+LOCATION = os.environ.get("AGENT_RUNTIME_LOCATION", "europe-west1")
 RESOURCE = os.environ["AGENT_RESOURCE_NAME"]
 USER_ID = "support-manager-demo"
 
@@ -25,6 +25,9 @@ async def main(message: str, session_id: str | None) -> None:
         session_id = session["id"] if isinstance(session, dict) else session.id
     print(f"session: {session_id}\n")
     async for event in remote.async_stream_query(user_id=USER_ID, session_id=session_id, message=message):
+        if event.get("error_code") or event.get("error_message"):
+            print("✗ error       :", event.get("error_code"), "-", event.get("error_message"))
+            continue
         for part in event.get("content", {}).get("parts", []):
             if "function_call" in part:
                 print("→ tool call   :", part["function_call"]["name"])
