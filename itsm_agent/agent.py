@@ -3,9 +3,11 @@ import os
 
 from google.adk.agents import Agent
 from google.adk.tools import BaseTool, FunctionTool, ToolContext
+from google.adk.models.google_llm import Gemini
 
 from .tools import create_problem, detect_recurrence, list_incidents, propose_problem
 
+MODEL_LOCATION = os.environ.get("MODEL_LOCATION", "eu")  # EU multi-region: EU residency + pay-as-you-go quota
 
 def require_prior_approval(tool: BaseTool, args: dict, tool_context: ToolContext):
     """Session-state guard on create_problem (works on every runtime).
@@ -37,7 +39,7 @@ create_problem_tool = (
 
 root_agent = Agent(
     name="itsm_incident_agent",
-    model="gemini-3.5-flash",
+    model=Gemini(model="gemini-3.5-flash", client_kwargs={"vertexai": True, "location": MODEL_LOCATION}),
     description="IT incident management assistant for support managers.",
     instruction=(
         "You are an IT support assistant for a support manager.\n"

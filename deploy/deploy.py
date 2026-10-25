@@ -6,6 +6,7 @@ variables at deploy time (next step: Secret Manager references).
 Run from the repo root:  python deploy/deploy.py
 """
 import os
+os.environ["ADK_REQUIRE_TOOL_CONFIRMATION"] = "0"  # evaluated at import time: must be set before the agent is built and pickled
 
 import vertexai
 from dotenv import load_dotenv
@@ -15,7 +16,7 @@ from itsm_agent.agent import root_agent
 
 load_dotenv(".env")
 PROJECT = os.environ["GOOGLE_CLOUD_PROJECT"]
-LOCATION = os.environ.get("AGENT_RUNTIME_LOCATION", "eu")
+LOCATION = os.environ.get("AGENT_RUNTIME_LOCATION", "europe-west1")
 STAGING_BUCKET = os.environ.get("STAGING_BUCKET", f"gs://{PROJECT}-agent-staging")
 
 client = vertexai.Client(project=PROJECT, location=LOCATION)
@@ -35,7 +36,8 @@ remote_agent = client.agent_engines.create(
             "SERVICENOW_USERNAME": os.environ["SERVICENOW_USERNAME"],
             "SERVICENOW_PASSWORD": os.environ["SERVICENOW_PASSWORD"],
             "ADK_REQUIRE_TOOL_CONFIRMATION": "0",
+            "MODEL_LOCATION": "eu",
         },
     },
 )
-print("Deployed:", getattr(remote_agent, "api_resource", remote_agent))
+print("Deployed:", remote_agent.api_resource.name)
