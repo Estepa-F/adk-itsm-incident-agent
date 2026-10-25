@@ -70,6 +70,7 @@ itsm_agent/          the ADK agent package
 deploy/
   deploy.py          deploy to Agent Runtime (python -m deploy.deploy)
   query.py           talk to the deployed agent (python -m deploy.query "<message>" [session_id])
+  delete.py          remove deployments (python -m deploy.delete <id> [<id> ...])
 scripts/
   seed_demo_data.py  create the five demo incidents (correlation_id = adk-demo)
 docs/
